@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UIT Cupid - Love/Crush Relationship Graph</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.23.0/cytoscape.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for UIT Cupid */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #fdf2f8;
+        }
+
+        #cy {
+            width: 100%;
+            height: 500px;
+            display: block;
+            border: 2px solid #fbcfe8;
+            border-radius: 0.5rem;
+            background-color: #fdf2f8;
+        }
+
+        .cy-node {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background-size: cover;
+            background-position: center;
+            border: 3px solid #fff;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            transition: all 0.3s ease;
+        }
+
+        .cy-node:hover {
+            border-color: #ec4899;
+            cursor: move;
+            transform: scale(1.1);
+        }
+
+        .match-card {
+            transition: all 0.3s ease;
+        }
+
+        .match-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .interest-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            background-color: #fce7f3;
+            color: #be185d;
+            margin: 2px;
+        }
+        
+        .heartbeat {
+            animation: heartbeat 1.5s ease-in-out infinite both;
+        }
+        
+        @keyframes heartbeat {
+            from {
+                transform: scale(1);
+                transform-origin: center center;
+                animation-timing-function: ease-out;
+            }
+            10% {
+                transform: scale(0.91);
+                animation-timing-function: ease-in;
+            }
+            17% {
+                transform: scale(0.98);
+                animation-timing-function: ease-out;
+            }
+            33% {
+                transform: scale(0.87);
+                animation-timing-function: ease-in;
+            }
+            45% {
+                transform: scale(1);
+                animation-timing-function: ease-out;
+            }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(236, 72, 153, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(236, 72, 153, 0);
+            }
+        }
+        
+        /* Cytoscape tooltip */
+        #cy-tooltip {
+            position: absolute;
+            background: white;
+            padding: 10px;
+            border: 1px solid #fbcfe8;
+            border-radius: 5px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            pointer-events: none;
+            z-index: 1000;
+            max-width: 250px;
+            display: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <header class="bg-pink-500 text-white p-4 shadow-md">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-3xl font-bold heartbeat">❤️ UIT Cupid</h1>
+            <p class="text-pink-100">University Love Connection Graph</p>
+        </div>
+    </header>
+
+    <main class="container mx-auto p-4">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- User Form Section -->
+            <div class="lg:col-span-1 bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-bold text-pink-600 mb-4">Add Yourself</h2>
+                <form id="user-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Your Name</label>
+                        <input type="text" id="user-name" required 
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500 p-2 border"
+                               placeholder="Enter your name">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Profile Photo URL</label>
+                        <input type="url" id="user-photo" 
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500 p-2 border"
+                               placeholder="Leave empty for default avatar">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Select 3-5 Interests</label>
+                        <div class="mt-2 grid grid-cols-2 gap-2" id="interests-container">
+                            <!-- Interests will be populated by JS -->
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Who do you have a crush on?</label>
+                        <select id="crush-select" multiple class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500 h-32 p-2 border">
+                            <!-- Options will be populated by JS -->
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple people</p>
+                    </div>
+                    
+                    <button type="submit" class="w-full bg-pink-500 text-white py-2 px-4 rounded-md hover:bg-pink-600 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 transition-colors duration-300 pulse">
+                        Add to Graph
+                    </button>
+                </form>
+                
+                <div class="mt-8">
+                    <h3 class="text-xl font-semibold text-pink-600 mb-3">Top Matches For You</h3>
+                    <div id="matches-container" class="space-y-3">
+                        <p class="text-gray-500 text-center py-4">Add yourself and others to see matches!</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Graph Visualization Section -->
+            <div class="lg:col-span-2 bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-bold text-pink-600 mb-4">Love Connection Graph</h2>
+                <div id="cy"></div>
+                
+                <div class="mt-4 flex flex-wrap gap-4">
+                    <div class="flex items-center">
+                        <div class="w-4 h-4 bg-pink-400 rounded-full mr-1"></div>
+                        <span class="text-sm">One-sided crush</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-4 h-4 bg-red-500 rounded-full mr-1"></div>
+                        <span class="text-sm">Mutual crush</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-4 h-4 bg-blue-400 rounded-full mr-1"></div>
+                        <span class="text-sm">Friend/Interest</span>
+                    </div>
+                </div>
+                
+                <div class="mt-6 bg-pink-50 p-4 rounded-lg">
+                    <h3 class="font-semibold text-pink-700">How it works:</h3>
+                    <ul class="list-disc list-inside text-sm text-pink-600 mt-2 space-y-1">
+                        <li>Add yourself with your interests</li>
+                        <li>Select who you have a crush on</li>
+                        <li>See compatibility scores with others</li>
+                        <li>Mutual crushes will be highlighted in red</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="cy-tooltip"></div>
+
+    <footer class="bg-pink-500 text-white p-4 mt-8 text-center">
+        <p>UIT Cupid - A Discrete Mathematics Project | Data is stored temporarily and will be lost on page refresh</p>
+    </footer>
+
+    <script>
+        // Predefined list of interests
+        const PREDEFINED_INTERESTS = [
+            'Music', 'Sports', 'Art', 'Reading', 'Gaming',
+            'Cooking', 'Travel', 'Movies', 'Dancing', 'Photography',
+            'Technology', 'Nature', 'Fashion', 'Animals', 'Science'
+        ];
+
+        // Store users and relationships
+        let users = [];
+        let currentUser = null;
+
+        // Cytoscape graph instance
+        let cy;
+
+        // Tooltip element
+        const tooltip = document.getElementById('cy-tooltip');
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeInterestCheckboxes();
+            initializeGraph();
+            setupEventListeners();
+            
+            // Add some sample users for demo purposes
+            addSampleUsers();
+        });
+
+        // Add sample users for demonstration
+        function addSampleUsers() {
+            const sampleUsers = [
+                {
+                    name: 'Alex',
+                    photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=100&q=80',
+                    interests: ['Music', 'Sports', 'Movies']
+                },
+                {
+                    name: 'Taylor',
+                    photo: 'https://images.unsplash.com/photo-1554151228-14d9def656e4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=100&q=80',
+                    interests: ['Art', 'Reading', 'Travel']
+                },
+                {
+                    name: 'Jordan',
+                    photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=100&q=80',
+                    interests: ['Gaming', 'Technology', 'Science']
+                }
+            ];
+            
+            // Add sample users after a short delay for demo purposes
+            setTimeout(() => {
+                sampleUsers.forEach(user => {
+                    const newUser = {
+                        id: generateId(),
+                        name: user.name,
+                        photo: user.photo,
+                        interests: user.interests
+                    };
+                    
+                    users.push(newUser);
+                    addUserToGraph(newUser);
+                });
+                
+                // Update crush select dropdown
+                updateCrushSelect();
+            }, 1000);
+        }
+
+        // Set up the interest checkboxes
+        function initializeInterestCheckboxes() {
+            const container = document.getElementById('interests-container');
+            
+            PREDEFINED_INTERESTS.forEach(interest => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center';
+                
+                const input = document.createElement('input');
+                input.type = 'checkbox';
+                input.id = `interest-${interest}`;
+                input.name = 'interests';
+                input.value = interest;
+                input.className = 'rounded text-pink-600 focus:ring-pink-500';
+                
+                const label = document.createElement('label');
+                label.htmlFor = `interest-${interest}`;
+                label.textContent = interest;
+                label.className = 'ml-2 text-sm text-gray-700';
+                
+                div.appendChild(input);
+                div.appendChild(label);
+                container.appendChild(div);
+            });
+        }
+
+        // Initialize the Cytoscape graph
+        function initializeGraph() {
+            cy = cytoscape({
+                container: document.getElementById('cy'),
+                
+                elements: [],
+                
+                style: [
+                    {
+                        selector: 'node',
+                        style: {
+                            'background-fit': 'cover',
+                            'background-image': function(ele) {
+                                return ele.data('photo') || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=100&q=80';
+                            },
+                            'width': 60,
+                            'height': 60,
+                            'border-width': 3,
+                            'border-color': '#fff',
+                            'border-style': 'solid'
+                        }
+                    },
+                    {
+                        selector: 'edge',
+                        style: {
+                            'width': 3,
+                            'line-color': '#f472b6',
+                            'target-arrow-color': '#f472b6',
+                            'target-arrow-shape': 'triangle',
+                            'curve-style': 'bezier',
+                            'arrow-scale': 1.5
+                        }
+                    },
+                    {
+                        selector: '.mutual',
+                        style: {
+                            'line-color': '#ef4444',
+                            'target-arrow-color': '#ef4444',
+                            'width': 4
+                        }
+                    },
+                    {
+                        selector: '.onesided',
+                        style: {
+                            'line-color': '#f472b6',
+                            'target-arrow-color': '#f472b6'
+                        }
+                    },
+                    {
+                        selector: '.friend',
+                        style: {
+                            'line-color': '#60a5fa',
+                            'target-arrow-color': '#60a5fa',
+                            'line-style': 'dashed'
+                        }
+                    },
+                    {
+                        selector: '.highlighted',
+                        style: {
+                            'border-color': '#ec4899',
+                            'border-width': 5,
+                            'border-style': 'solid'
+                        }
+                    }
+                ],
+                
+                layout: {
+                    name: 'cose',
+                    idealEdgeLength: 100,
+                    nodeOverlap: 20,
+                    refresh: 20,
+                    fit: true,
+                    padding: 30,
+                    randomize: false,
+                    componentSpacing: 100,
+                    nodeRepulsion: 400000,
+                    edgeElasticity: 100,
+                    nestingFactor: 5,
+                    gravity: 80,
+                    numIter: 1000,
+                    initialTemp: 200,
+                    coolingFactor: 0.95,
+                    minTemp: 1.0
+                }
+            });
+            
+            // Add node hover functionality
+            cy.on('mouseover', 'node', function(event) {
+                const node = event.target;
+                showNodeInfo(node, event);
+            });
+            
+            cy.on('mouseout', 'node', function() {
+                hideNodeInfo();
+            });
+            
+            // Make nodes draggable
+            cy.on('drag', 'node', function(event) {
+                // Update layout when dragging stops
+                cy.layout({ name: 'preset' }).run();
+            });
+        }
+
+        // Show node information on hover
+        function showNodeInfo(node, event) {
+            const user = users.find(u => u.id === node.data('id'));
+            if (!user) return;
+            
+            // Calculate compatibility if there's a current user
+            let compatibilityHtml = '';
+            if (currentUser && user.id !== currentUser.id) {
+                const score = calculateCompatibility(currentUser, user);
+                compatibilityHtml = `<div class="mt-2 text-sm">Compatibility: <span class="font-semibold">${score.toFixed(1)}%</span></div>`;
+            }
+            
+            // Build interests HTML
+            const interestsHtml = user.interests.map(i => 
+                `<span class="interest-badge">${i}</span>`
+            ).join('');
+            
+            tooltip.innerHTML = `
+                <div class="flex items-center">
+                    <img src="${user.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=100&q=80'}" class="w-12 h-12 rounded-full object-cover mr-3">
+                    <h3 class="font-bold text-lg">${user.name}</h3>
+                </div>
+                <div class="mt-2">
+                    <p class="text-sm text-gray-600">Interests:</p>
+                    <div class="flex flex-wrap mt-1">${interestsHtml}</div>
+                </div>
+                ${compatibilityHtml}
+            `;
+            
+            // Position and show tooltip
+            const pos = event.renderedPosition;
+            tooltip.style.left = (pos.x + 10) + 'px';
+            tooltip.style.top = (pos.y + 10) + 'px';
+            tooltip.style.display = 'block';
+        }
+
+        // Hide node information
+        function hideNodeInfo() {
+            tooltip.style.display = 'none';
+        }
+
+        // Set up event listeners
+        function setupEventListeners() {
+            const userForm = document.getElementById('user-form');
+            userForm.addEventListener('submit', handleUserSubmit);
+        }
+
+        // Handle user form submission
+        function handleUserSubmit(e) {
+            e.preventDefault();
+            
+            // Get form values
+            const name = document.getElementById('user-name').value;
+            const photo = document.getElementById('user-photo').value;
+            
+            // Get selected interests
+            const interestCheckboxes = document.querySelectorAll('input[name="interests"]:checked');
+            const interests = Array.from(interestCheckboxes).map(cb => cb.value);
+            
+            // Validate interests
+            if (interests.length < 3 || interests.length > 5) {
+                alert('Please select between 3 and 5 interests');
+                return;
+            }
+            
+            // Get selected crushes
+            const crushSelect = document.getElementById('crush-select');
+            const crushIds = Array.from(crushSelect.selectedOptions).map(option => option.value);
+            
+            // Create user object
+            const user = {
+                id: generateId(),
+                name,
+                photo: photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=100&q=80',
+                interests
+            };
+            
+            // Add user to the list
+            users.push(user);
+            currentUser = user;
+            
+            // Add user to graph
+            addUserToGraph(user);
+            
+            // Add crush relationships
+            crushIds.forEach(crushId => {
+                addCrushRelationship(user.id, crushId);
+            });
+            
+            // Update crush select dropdown
+            updateCrushSelect();
+            
+            // Calculate and display matches
+            calculateAndDisplayMatches();
+            
+            // Reset form
+            document.getElementById('user-name').value = '';
+            document.getElementById('user-photo').value = '';
+            document.querySelectorAll('input[name="interests"]:checked').forEach(cb => cb.checked = false);
+            crushSelect.selectedIndex = -1;
+        }
+
+        // Generate a unique ID
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substring(2);
+        }
+
+        // Add user to the graph
+        function addUserToGraph(user) {
+            cy.add({
+                group: 'nodes',
+                data: {
+                    id: user.id,
+                    name: user.name,
+                    photo: user.photo,
+                    interests: user.interests
+                },
+                position: {
+                    x: Math.random() * 300,
+                    y: Math.random() * 300
+                }
+            });
+            
+            // Refresh graph layout
+            cy.layout({ name: 'cose' }).run();
+        }
+
+        // Add crush relationship
+        function addCrushRelationship(fromId, toId) {
+            // Check if relationship already exists
+            const existingEdge = cy.edges(`[source = "${fromId}"][target = "${toId}"]`);
+            if (existingEdge.length > 0) return;
+            
+            // Add the new edge
+            cy.add({
+                group: 'edges',
+                data: {
+                    id: `edge-${fromId}-${toId}`,
+                    source: fromId,
+                    target: toId
+                },
+                classes: 'onesided'
+            });
+            
+            // Check if this creates a mutual relationship
+            const reverseEdge = cy.edges(`[source = "${toId}"][target = "${fromId}"]`);
+            if (reverseEdge.length > 0) {
+                // Update both edges to mutual class
+                reverseEdge.addClass('mutual').removeClass('onesided');
+                cy.edges(`[source = "${fromId}"][target = "${toId}"]`).addClass('mutual').removeClass('onesided');
+                
+                // Add animation for mutual crush
+                const fromNode = cy.getElementById(fromId);
+                const toNode = cy.getElementById(toId);
+                
+                fromNode.animate({
+                    style: {'border-color': '#ef4444'},
+                    duration: 1000
+                });
+                
+                toNode.animate({
+                    style: {'border-color': '#ef4444'},
+                    duration: 1000
+                });
+            }
+            
+            // Refresh graph layout
+            cy.layout({ name: 'cose' }).run();
+        }
+
+        // Update the crush select dropdown
+        function updateCrushSelect() {
+            const crushSelect = document.getElementById('crush-select');
+            
+            // Clear existing options except the first one
+            while (crushSelect.options.length > 0) {
+                crushSelect.remove(0);
+            }
+            
+            // Add current users as options
+            users.forEach(user => {
+                // Don't allow selecting yourself
+                if (currentUser && user.id === currentUser.id) return;
+                
+                const option = document.createElement('option');
+                option.value = user.id;
+                option.textContent = user.name;
+                crushSelect.appendChild(option);
+            });
+        }
+
+        // Calculate compatibility between two users
+        function calculateCompatibility(user1, user2) {
+            // Weight factors
+            const sharedInterestsWeight = 0.7;
+            const distanceWeight = 0.3;
+            
+            // Calculate shared interests
+            const sharedInterests = user1.interests.filter(
+                interest => user2.interests.includes(interest)
+            ).length;
+            
+            // Calculate shortest path distance (using BFS)
+            const distance = calculateShortestPath(user1.id, user2.id);
+            
+            // If there's no path, set a high distance value
+            const effectiveDistance = distance === -1 ? 10 : distance;
+            
+            // Normalize scores (shared interests: 0-5, distance: 0-10 inverse)
+            const normalizedShared = (sharedInterests / 5) * 100;
+            const normalizedDistance = (1 / effectiveDistance) * 100;
+            
+            // Calculate final score
+            const score = (normalizedShared * sharedInterestsWeight) + 
+                         (normalizedDistance * distanceWeight);
+            
+            return Math.min(score, 100); // Cap at 100%
+        }
+
+        // Calculate shortest path between two users using BFS
+        function calculateShortestPath(sourceId, targetId) {
+            // If source and target are the same
+            if (sourceId === targetId) return 0;
+            
+            // Initialize data structures
+            const visited = new Set();
+            const queue = [{ id: sourceId, distance: 0 }];
+            
+            // Perform BFS
+            while (queue.length > 0) {
+                const { id, distance } = queue.shift();
+                
+                // If we found the target
+                if (id === targetId) return distance;
+                
+                // Mark as visited
+                visited.add(id);
+                
+                // Get all neighbors (both incoming and outgoing edges)
+                const edges = cy.edges().filter(edge => 
+                    edge.data('source') === id || edge.data('target') === id
+                );
+                
+                // Add neighbors to queue
+                edges.forEach(edge => {
+                    const neighborId = edge.data('source') === id ? 
+                                      edge.data('target') : edge.data('source');
+                    
+                    if (!visited.has(neighborId)) {
+                        queue.push({ id: neighborId, distance: distance + 1 });
+                        visited.add(neighborId); // Mark to avoid re-adding
+                    }
+                });
+            }
+            
+            // No path found
+            return -1;
+        }
+
+        // Calculate and display top matches
+        function calculateAndDisplayMatches() {
+            if (!currentUser) return;
+            
+            const matchesContainer = document.getElementById('matches-container');
+            matchesContainer.innerHTML = '';
+            
+            // Calculate compatibility with all other users
+            const matches = users
+                .filter(user => user.id !== currentUser.id)
+                .map(user => ({
+                    user,
+                    score: calculateCompatibility(currentUser, user)
+                }))
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 3); // Top 3 matches
+            
+            // Display matches
+            if (matches.length > 0) {
+                matches.forEach(match => {
+                    const matchElement = document.createElement('div');
+                    matchElement.className = 'match-card bg-pink-50 p-4 rounded-lg border border-pink-200';
+                    
+                    matchElement.innerHTML = `
+                        <div class="flex items-center">
+                            <img src="${match.user.photo}" 
+                                 class="w-12 h-12 rounded-full object-cover mr-3">
+                            <div>
+                                <h4 class="font-semibold">${match.user.name}</h4>
+                                <p class="text-sm text-pink-600">Compatibility: ${match.score.toFixed(1)}%</p>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <p class="text-xs text-gray-600">Shared interests:</p>
+                            <div class="flex flex-wrap mt-1">
+                                ${currentUser.interests
+                                    .filter(interest => match.user.interests.includes(interest))
+                                    .map(interest => `<span class="interest-badge">${interest}</span>`)
+                                    .join('')}
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Add click to highlight in graph
+                    matchElement.addEventListener('click', () => {
+                        // Remove previous highlights
+                        cy.elements().removeClass('highlighted');
+                        
+                        // Highlight this match
+                        const node = cy.getElementById(match.user.id);
+                        node.addClass('highlighted');
+                        
+                        // Center on this node
+                        cy.animate({
+                            center: { eles: node },
+                            zoom: 1.5,
+                            duration: 1000
+                        });
+                    });
+                    
+                    matchesContainer.appendChild(matchElement);
+                });
+            } else {
+                matchesContainer.innerHTML = '<p class="text-gray-500">No matches found yet. Add more users to see matches.</p>';
+            }
+        }
+    </script>
+</body>
+</html>
